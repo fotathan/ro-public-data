@@ -40,13 +40,18 @@ export default async function handler(req, res) {
 
   try {
     console.log("→ upstream", req.method, target);
-    const upstream = await fetch(target, fetchOpts);
+    const upstream = await fetch(target, {
+      ...fetchOpts,
+      signal: AbortSignal.timeout(25000),
+    });
     const text = await upstream.text();
     console.log("← upstream", upstream.status, "(", text.length, "bytes)");
 
     res.status(upstream.status);
     res.setHeader("Content-Type",
       upstream.headers.get("content-type") || "application/json");
+    res.setHeader("Cache-Control",
+      "s-maxage=3600, stale-while-revalidate=86400");
     res.send(text);
   } catch (e) {
     console.error("PROXY ERROR:", e);
