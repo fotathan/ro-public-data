@@ -122,12 +122,12 @@ async function fetchAnaf(cui) {
 //  data.gov.ro CKAN — discover the "Contracte" resource for a given year
 // ───────────────────────────────────────────────────────────────────────────
 async function findContractsResource(year) {
-  const url = `https://data.gov.ro/api/3/action/package_show?id=achizitii-publice-${year}`;
+  const target = `https://data.gov.ro/api/3/action/package_show?id=achizitii-publice-${year}`;
+  const url = `https://corsproxy.io/?url=${encodeURIComponent(target)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`data.gov.ro returned ${res.status}`);
   const json = await res.json();
   if (!json.success) throw new Error("Dataset not available for that year");
-  // Find the resource named like "Contracte"
   const contracts = (json.result.resources || []).find((r) =>
     /contract/i.test(r.name) && !/subsec/i.test(r.name)
   );
@@ -143,7 +143,8 @@ async function searchProcurement({ year, q, limit = 25 }) {
   }
   const params = new URLSearchParams({ resource_id: rid, limit: String(limit) });
   if (q) params.set("q", q);
-  const url = `https://data.gov.ro/api/3/action/datastore_search?${params}`;
+  const target = `https://data.gov.ro/api/3/action/datastore_search?${params}`;
+  const url = `https://corsproxy.io/?url=${encodeURIComponent(target)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`CKAN returned ${res.status}`);
   const json = await res.json();
