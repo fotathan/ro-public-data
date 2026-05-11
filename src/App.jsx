@@ -73,49 +73,23 @@ const STATUS_EN = (ro = "") => {
 async function fetchAnaf(cui) {
   const cleanCui = String(cui).replace(/^RO/i, "").trim();
   const today = new Date().toISOString().slice(0, 10);
-  const payload = [{ cui: Number(cleanCui), data: today }];
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify([{ cui: Number(cleanCui), data: today }]);
 
-  console.log("[ANAF] sending →", { cui: cleanCui, date: today, payload });
+  console.log("[ANAF] sending →", { cui: cleanCui, date: today });
 
-  // Try multiple CORS proxies — public ones often rate-limit or go down.
-  const proxies = [
-    (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    (u) => `https://cors.eu.org/${u}`,
-  ];
+  const res = await fetch(PROXY + encodeURIComponent(ANAF_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  console.log("[ANAF] HTTP status:", res.status);
+  if (!res.ok) throw new Error(`Proxy returned ${res.status}`);
+  const data = await res.json();
+  console.log("[ANAF] parsed:", data);
 
-  let lastErr;
-  for (const wrap of proxies) {
-    const target = wrap(ANAF_URL);
-    console.log("[ANAF] trying proxy →", target);
-    try {
-      const res = await fetch(target, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-      console.log("[ANAF] HTTP status:", res.status);
-      const rawText = await res.text();
-      console.log("[ANAF] raw body:", rawText.slice(0, 500));
-
-      if (!res.ok) { lastErr = new Error(`Proxy returned ${res.status}`); continue; }
-
-      let data;
-      try { data = JSON.parse(rawText); }
-      catch { lastErr = new Error("Response wasn't JSON: " + rawText.slice(0, 100)); continue; }
-
-      console.log("[ANAF] parsed:", data);
-
-      const hit = data.found && data.found[0];
-      if (!hit) throw new Error(`CUI ${cleanCui} not found in ANAF registry`);
-      return hit;
-    } catch (e) {
-      console.log("[ANAF] proxy failed:", e.message);
-      lastErr = e;
-    }
-  }
-  throw lastErr || new Error("All CORS proxies failed");
+  const hit = data.found && data.found[0];
+  if (!hit) throw new Error(`CUI ${cleanCui} not found in ANAF registry`);
+  return hit;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -123,7 +97,7 @@ async function fetchAnaf(cui) {
 // ───────────────────────────────────────────────────────────────────────────
 async function findContractsResource(year) {
   const target = `https://data.gov.ro/api/3/action/package_show?id=achizitii-publice-${year}`;
-  const url = `https://corsproxy.io/?url=${encodeURIComponent(target)}`;
+  const url = PROXY + encodeURIComponent(target);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`data.gov.ro returned ${res.status}`);
   const json = await res.json();
@@ -144,7 +118,7 @@ async function searchProcurement({ year, q, limit = 25 }) {
   const params = new URLSearchParams({ resource_id: rid, limit: String(limit) });
   if (q) params.set("q", q);
   const target = `https://data.gov.ro/api/3/action/datastore_search?${params}`;
-  const url = `https://corsproxy.io/?url=${encodeURIComponent(target)}`;
+  const url = PROXY + encodeURIComponent(target);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`CKAN returned ${res.status}`);
   const json = await res.json();
