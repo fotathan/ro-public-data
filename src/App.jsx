@@ -675,6 +675,7 @@ const S = {
     fontFamily: "'Fraunces', serif",
     fontSize: 40, fontWeight: 600, letterSpacing: "-0.02em",
     margin: "0 0 6px", lineHeight: 1.1,
+    color: PALETTE.ink,
   },
   tagline: { margin: 0, color: PALETTE.muted, fontSize: 15, maxWidth: 620 },
   tabs: {
@@ -702,11 +703,13 @@ const S = {
     fontFamily: "'Fraunces', serif",
     fontSize: 28, fontWeight: 600, letterSpacing: "-0.01em",
     margin: "0 0 8px",
+    color: PALETTE.ink,
   },
   h3: {
     fontFamily: "'Fraunces', serif",
     fontSize: 18, fontWeight: 600,
     margin: "32px 0 12px",
+    color: PALETTE.ink,
   },
   lead: { color: PALETTE.muted, maxWidth: 720, margin: "0 0 28px" },
   queryBar: {
