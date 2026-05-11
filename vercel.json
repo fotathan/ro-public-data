@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/proxy.js": {
+      "regions": ["fra1"]
+    }
+  }
+}
