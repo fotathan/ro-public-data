@@ -729,6 +729,7 @@ const S = {
   select: {
     padding: "12px 16px",
     background: PALETTE.paper,
+    color: PALETTE.ink,
     border: `1px solid ${PALETTE.rule}`,
     borderRadius: 4, fontSize: 14,
   },
