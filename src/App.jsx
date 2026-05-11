@@ -21,8 +21,8 @@ import React, { useState, useMemo } from "react";
 // ───────────────────────────────────────────────────────────────────────────
 
 // Public CORS proxy. Replace with your own in production.
-const ANAF_PROXY = "https://corsproxy.io/?url=";
-const ANAF_URL   = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
+const PROXY = "/api/proxy?url=";
+const ANAF_URL = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
 
 // data.gov.ro publishes one dataset per year, each with several CSV resources
 // (Contracts, Participation notices, Direct purchases, etc). The resource_id
