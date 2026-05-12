@@ -273,7 +273,7 @@ function AnafPanel() {
           style={S.input}
           autoFocus
         />
-        <button onClick={run} disabled={busy} style={S.btn}>
+        <button onClick={() => run()} disabled={busy} style={S.btn}>
           {busy ? "Querying ANAF…" : "Look up"}
         </button>
       </div>
