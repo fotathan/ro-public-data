@@ -85,14 +85,20 @@ async function fetchAnaf(cui) {
     body,
   });
   console.log("[ANAF] HTTP status:", res.status);
-  if (!res.ok) throw new Error(`Proxy returned ${res.status}`);
-  const data = await res.json();
-  console.log("[ANAF] parsed:", data);
+  const rawText = await res.text();
+  console.log("[ANAF] raw body:", rawText.slice(0, 300));
+
+  let data;
+  try { data = JSON.parse(rawText); } catch {
+    throw new Error(
+      `CUI ${cleanCui} not found in ANAF's VAT registry. The company may be struck off, never registered, or a non-VAT entity (e.g. a PFA or a non-trading legal person).`
+    );
+  }
 
   const hit = data.found && data.found[0];
   if (!hit) throw new Error(
-  `CUI ${cleanCui} not found in ANAF's VAT registry. The company may be struck off, never registered, or a non-VAT entity (e.g. a PFA or a non-trading legal person).`
-);
+    `CUI ${cleanCui} not found in ANAF's VAT registry. The company may be struck off, never registered, or a non-VAT entity (e.g. a PFA or a non-trading legal person).`
+  );
   return hit;
 }
 
