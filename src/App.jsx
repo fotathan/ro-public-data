@@ -533,9 +533,9 @@ function StatsPanel() {
           {/* Top suppliers */}
           <Card title="Top 15 suppliers by total contract value">
             <ResponsiveContainer width="100%" height={420}>
-              <BarChart data={stats.topSuppliers} layout="vertical" margin={{ left: 80, right: 24 }}>
-                <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
-                <YAxis type="category" dataKey="name" width={180} stroke="#0f1419" fontSize={11} />
+              <BarChart data={stats.topSuppliers} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+  <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+  <YAxis type="category" dataKey="name" width={220} stroke="#0f1419" fontSize={11} interval={0} />
                 <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
                 <Bar dataKey="value" fill="#002b7f" />
               </BarChart>
@@ -545,9 +545,9 @@ function StatsPanel() {
           {/* Top contracting authorities */}
           <Card title="Top 15 contracting authorities by total spend">
             <ResponsiveContainer width="100%" height={420}>
-              <BarChart data={stats.topAuthorities} layout="vertical" margin={{ left: 80, right: 24 }}>
-                <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
-                <YAxis type="category" dataKey="name" width={180} stroke="#0f1419" fontSize={11} />
+              <BarChart data={stats.topAuthorities} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+  <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+  <YAxis type="category" dataKey="name" width={220} stroke="#0f1419" fontSize={11} interval={0} />
                 <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
                 <Bar dataKey="value" fill="#ce1126" />
               </BarChart>
@@ -558,9 +558,9 @@ function StatsPanel() {
           <div style={S.twoCol}>
             <Card title="Top 10 CPV codes by spend">
               <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={stats.topCPV} layout="vertical" margin={{ left: 60, right: 16 }}>
-                  <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
-                  <YAxis type="category" dataKey="code" width={90} stroke="#0f1419" fontSize={11} />
+                <BarChart data={stats.topCPV} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+  <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+  <YAxis type="category" dataKey="code" width={100} stroke="#0f1419" fontSize={11} interval={0} />
                   <Tooltip
                     formatter={(v) => fmtBig(v) + " RON"}
                     labelFormatter={(code) => {
@@ -576,17 +576,23 @@ function StatsPanel() {
             <Card title="Procedure type breakdown">
               <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
-                  <Pie
-                    data={stats.byProcedure}
-                    dataKey="value" nameKey="name"
-                    outerRadius={110} label={(d) => d.name}
-                  >
-                    {stats.byProcedure.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => v.toLocaleString() + " contracts"} />
-                </PieChart>
+  <Pie
+    data={stats.byProcedure}
+    dataKey="value" nameKey="name"
+    cx="35%" cy="50%"
+    outerRadius={100}
+  >
+    {stats.byProcedure.map((_, i) => (
+      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+    ))}
+  </Pie>
+  <Tooltip formatter={(v) => v.toLocaleString() + " contracts"} />
+  <Legend
+    layout="vertical" align="right" verticalAlign="middle"
+    iconType="circle"
+    formatter={(value) => <span style={{ color: "#0f1419", fontSize: 12 }}>{value}</span>}
+  />
+</PieChart>
               </ResponsiveContainer>
             </Card>
           </div>
@@ -594,9 +600,9 @@ function StatsPanel() {
           {/* Geographic distribution */}
           <Card title="Top 15 supplier locations by total value">
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={stats.topCities} layout="vertical" margin={{ left: 80, right: 24 }}>
-                <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
-                <YAxis type="category" dataKey="name" width={150} stroke="#0f1419" fontSize={11} />
+              <BarChart data={stats.topCities} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+  <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+  <YAxis type="category" dataKey="name" width={150} stroke="#0f1419" fontSize={11} interval={0} />
                 <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
                 <Bar dataKey="value" fill="#15803d" />
               </BarChart>
