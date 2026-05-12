@@ -484,22 +484,24 @@ function AIPanel() {
     "Is Borg Design active?",
   ];
 
-  const run = async (question = q) => {
-    if (!question.trim()) return;
-    setBusy(true); setErr(""); setPlan(null); setR(null);
-    try {
-      const p = await askAI(question);
-      setPlan(p);
-      if (p.intent === "anaf" && p.cui) {
-        setR({ type: "anaf", data: await fetchAnaf(p.cui) });
-      } else if (p.intent === "procurement") {
-        const year = p.year || "2024";
-        const data = await searchProcurement({ year, q: p.query || "", limit: 15 });
-        setR({ type: "procurement", data });
-      }
-    } catch (e) { console.error("LOOKUP FAILED:", e); setErr(e.message); }
-    finally { setBusy(false); }
-  };
+  const run = async (value) => {
+  const question = (value ?? q).trim();
+  if (!question) return;
+  setQ(question);
+  setBusy(true); setErr(""); setPlan(null); setR(null);
+  try {
+    const p = await askAI(question);
+    setPlan(p);
+    if (p.intent === "anaf" && p.cui) {
+      setR({ type: "anaf", data: await fetchAnaf(p.cui) });
+    } else if (p.intent === "procurement") {
+      const year = p.year || "2024";
+      const data = await searchProcurement({ year, q: p.query || "", limit: 15 });
+      setR({ type: "procurement", data });
+    }
+  } catch (e) { console.error("LOOKUP FAILED:", e); setErr(e.message); }
+  finally { setBusy(false); }
+};
 
   return (
     <section>
@@ -526,11 +528,11 @@ function AIPanel() {
       <div style={S.exampleRow}>
         Try:
         {examples.map((e) => (
-          <button key={e} style={S.chip}
-                  onClick={() => { setQ(e); setTimeout(() => run(e), 0); }}>
-            {e}
-          </button>
-        ))}
+  <button key={e} style={S.chip}
+          onClick={() => run(e)}>
+    {e}
+  </button>
+))}
       </div>
 
       {err  && <div style={S.error}>⚠ {err}</div>}
