@@ -536,7 +536,7 @@ function StatsPanel() {
               <BarChart data={stats.topSuppliers} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
   <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
   <YAxis type="category" dataKey="name" width={220} stroke="#0f1419" fontSize={11} interval={0} />
-                <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
+                <Tooltip formatter={(v) => v.toLocaleString() + " RON"} />
                 <Bar dataKey="value" fill="#002b7f" />
               </BarChart>
             </ResponsiveContainer>
@@ -548,7 +548,7 @@ function StatsPanel() {
               <BarChart data={stats.topAuthorities} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
   <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
   <YAxis type="category" dataKey="name" width={220} stroke="#0f1419" fontSize={11} interval={0} />
-                <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
+                <Tooltip formatter={(v) => v.toLocaleString() + " RON"} />
                 <Bar dataKey="value" fill="#ce1126" />
               </BarChart>
             </ResponsiveContainer>
@@ -603,7 +603,7 @@ function StatsPanel() {
               <BarChart data={stats.topCities} layout="vertical" margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
   <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
   <YAxis type="category" dataKey="name" width={150} stroke="#0f1419" fontSize={11} interval={0} />
-                <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
+                <Tooltip formatter={(v) => v.toLocaleString() + " RON"} />
                 <Bar dataKey="value" fill="#15803d" />
               </BarChart>
             </ResponsiveContainer>
@@ -653,19 +653,37 @@ function fmtBig(n) {
 function parseRoNumber(s) {
   if (s == null || s === "") return NaN;
   let str = String(s).trim();
-  // If it has both . and , the rightmost is decimal separator
   const lastDot = str.lastIndexOf(".");
   const lastComma = str.lastIndexOf(",");
+
   if (lastDot > -1 && lastComma > -1) {
-    if (lastComma > lastDot) { // RO format: 1.234,56
+    // Both present: rightmost is the decimal separator
+    if (lastComma > lastDot) {
+      // RO: 1.234,56 → strip dots, swap comma for dot
       str = str.replace(/\./g, "").replace(",", ".");
-    } else {                    // EN format: 1,234.56
+    } else {
+      // EN: 1,234.56 → strip commas
       str = str.replace(/,/g, "");
     }
-  } else if (lastComma > -1) {  // only comma — assume decimal
-    str = str.replace(",", ".");
+  } else if (lastComma > -1) {
+    // Only commas. Could be EN thousands (16,170,960) or RO decimal (1234,56).
+    // Heuristic: if there are 2+ commas, they're thousands separators.
+    // If only 1 comma AND the part after it is 1-2 digits, it's a decimal.
+    const parts = str.split(",");
+    if (parts.length > 2) {
+      // 16,170,960 → 16170960
+      str = str.replace(/,/g, "");
+    } else if (parts[1] && parts[1].length === 3) {
+      // 16,170 — could be thousands (16170) or decimal (16.170, very unusual).
+      // Assume thousands when exactly 3 digits follow.
+      str = str.replace(",", "");
+    } else {
+      // 1234,56 → 1234.56
+      str = str.replace(",", ".");
+    }
   }
-  // strip anything that's not digit, dot, minus
+  // dot-only or no separator: parseFloat handles it natively
+
   str = str.replace(/[^\d.-]/g, "");
   const n = parseFloat(str);
   return isFinite(n) ? n : NaN;
