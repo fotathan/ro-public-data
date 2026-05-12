@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import Papa from "papaparse";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
 
 // ───────────────────────────────────────────────────────────────────────────
 //  RO PUBLIC DATA — ENGLISH
@@ -216,11 +220,12 @@ export default function App() {
         </div>
         <nav style={S.tabs}>
           {[
-            ["anaf",        "Company / ANAF"],
-            ["procurement", "Procurement / SEAP"],
-            ["ai",          "Ask in English"],
-            ["about",       "Sources"],
-          ].map(([k, label]) => (
+  ["anaf",        "Company / ANAF"],
+  ["procurement", "Procurement / SEAP"],
+  ["stats",       "Procurement Stats"],
+  ["ai",          "Ask in English"],
+  ["about",       "Sources"],
+].map(([k, label]) => (
             <button key={k} onClick={() => setTab(k)}
                     style={{ ...S.tab, ...(tab === k ? S.tabActive : {}) }}>
               {label}
@@ -232,6 +237,7 @@ export default function App() {
       <main style={S.main}>
         {tab === "anaf"        && <AnafPanel />}
         {tab === "procurement" && <ProcurementPanel />}
+        {tab === "stats"       && <StatsPanel />}
         {tab === "ai"          && <AIPanel />}
         {tab === "about"       && <AboutPanel />}
       </main>
@@ -475,6 +481,281 @@ function ProcurementResults({ results }) {
       </div>
     </div>
   );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+function StatsPanel() {
+  const [dataset, setDataset] = useState("2024-q1");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    setLoading(true); setErr("");
+    loadProcurementData(dataset)
+      .then((data) => { setRows(data); setLoading(false); })
+      .catch((e) => { setErr(e.message); setLoading(false); });
+  }, [dataset]);
+
+  const stats = useMemo(() => computeStats(rows), [rows]);
+
+  return (
+    <section>
+      <h2 style={S.h2}>Procurement statistics</h2>
+      <p style={S.lead}>
+        Aggregate analysis of public procurement contracts. Computed from
+        the SEAP exports bundled with the app. Currently <strong>Q1 2024</strong>.
+      </p>
+
+      <div style={S.queryBar}>
+        <select value={dataset} onChange={(e) => setDataset(e.target.value)} style={S.select}>
+          {Object.entries(SEAP_FILES).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {loading && <div style={S.empty}>Loading dataset…</div>}
+      {err && <div style={S.error}>⚠ {err}</div>}
+
+      {!loading && !err && stats && (
+        <div>
+          {/* KPI cards */}
+          <div style={S.kpiRow}>
+            <Kpi label="Contracts" value={stats.totalContracts.toLocaleString()} />
+            <Kpi label="Total value (RON)" value={fmtBig(stats.totalValue)} accent />
+            <Kpi label="Unique suppliers" value={stats.uniqueSuppliers.toLocaleString()} />
+            <Kpi label="Contracting authorities" value={stats.uniqueAuthorities.toLocaleString()} />
+            <Kpi label="Average contract" value={fmtBig(stats.avgValue) + " RON"} />
+            <Kpi label="Median contract" value={fmtBig(stats.medianValue) + " RON"} />
+          </div>
+
+          {/* Top suppliers */}
+          <Card title="Top 15 suppliers by total contract value">
+            <ResponsiveContainer width="100%" height={420}>
+              <BarChart data={stats.topSuppliers} layout="vertical" margin={{ left: 80, right: 24 }}>
+                <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+                <YAxis type="category" dataKey="name" width={180} stroke="#0f1419" fontSize={11} />
+                <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
+                <Bar dataKey="value" fill="#002b7f" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Top contracting authorities */}
+          <Card title="Top 15 contracting authorities by total spend">
+            <ResponsiveContainer width="100%" height={420}>
+              <BarChart data={stats.topAuthorities} layout="vertical" margin={{ left: 80, right: 24 }}>
+                <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+                <YAxis type="category" dataKey="name" width={180} stroke="#0f1419" fontSize={11} />
+                <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
+                <Bar dataKey="value" fill="#ce1126" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Two charts side by side */}
+          <div style={S.twoCol}>
+            <Card title="Top 10 CPV codes by spend">
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={stats.topCPV} layout="vertical" margin={{ left: 60, right: 16 }}>
+                  <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+                  <YAxis type="category" dataKey="code" width={90} stroke="#0f1419" fontSize={11} />
+                  <Tooltip
+                    formatter={(v) => fmtBig(v) + " RON"}
+                    labelFormatter={(code) => {
+                      const item = stats.topCPV.find((x) => x.code === code);
+                      return item ? `${code}: ${item.label}` : code;
+                    }}
+                  />
+                  <Bar dataKey="value" fill="#0f1419" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+
+            <Card title="Procedure type breakdown">
+              <ResponsiveContainer width="100%" height={320}>
+                <PieChart>
+                  <Pie
+                    data={stats.byProcedure}
+                    dataKey="value" nameKey="name"
+                    outerRadius={110} label={(d) => d.name}
+                  >
+                    {stats.byProcedure.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => v.toLocaleString() + " contracts"} />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+
+          {/* Geographic distribution */}
+          <Card title="Top 15 supplier locations by total value">
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={stats.topCities} layout="vertical" margin={{ left: 80, right: 24 }}>
+                <XAxis type="number" tickFormatter={fmtBig} stroke="#6b6b66" fontSize={11} />
+                <YAxis type="category" dataKey="name" width={150} stroke="#0f1419" fontSize={11} />
+                <Tooltip formatter={(v) => fmtBig(v) + " RON"} />
+                <Bar dataKey="value" fill="#15803d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <p style={S.footnote}>
+            Values shown in RON. Charts exclude rows with missing or unparseable values.
+            CPV labels truncated for display — hover for full description.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const PIE_COLORS = ["#002b7f", "#ce1126", "#0f1419", "#15803d", "#b45309", "#6b21a8", "#0e7490"];
+
+function Kpi({ label, value, accent }) {
+  return (
+    <div style={{ ...S.kpi, ...(accent ? S.kpiAccent : {}) }}>
+      <div style={S.kpiLabel}>{label}</div>
+      <div style={S.kpiValue}>{value}</div>
+    </div>
+  );
+}
+
+function Card({ title, children }) {
+  return (
+    <div style={S.card}>
+      <div style={S.cardTitle}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+// Compress big numbers: 1234567 → "1.23M"
+function fmtBig(n) {
+  if (n == null || isNaN(n)) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (abs >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (abs >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return n.toFixed(0);
+}
+
+// Parse a Romanian-formatted number: "1.234.567,89" or "1234567.89" or "1234567,89"
+function parseRoNumber(s) {
+  if (s == null || s === "") return NaN;
+  let str = String(s).trim();
+  // If it has both . and , the rightmost is decimal separator
+  const lastDot = str.lastIndexOf(".");
+  const lastComma = str.lastIndexOf(",");
+  if (lastDot > -1 && lastComma > -1) {
+    if (lastComma > lastDot) { // RO format: 1.234,56
+      str = str.replace(/\./g, "").replace(",", ".");
+    } else {                    // EN format: 1,234.56
+      str = str.replace(/,/g, "");
+    }
+  } else if (lastComma > -1) {  // only comma — assume decimal
+    str = str.replace(",", ".");
+  }
+  // strip anything that's not digit, dot, minus
+  str = str.replace(/[^\d.-]/g, "");
+  const n = parseFloat(str);
+  return isFinite(n) ? n : NaN;
+}
+
+function computeStats(rows) {
+  if (!rows || !rows.length) return null;
+
+  // Discover the value column (CSV column names vary slightly)
+  const sample = rows[0];
+  const valueCol = Object.keys(sample).find((k) => /valoare/i.test(k)) || "Valoare contract (RON)";
+  const supplierCol = Object.keys(sample).find((k) => /ofertant/i.test(k)) || "Ofertant";
+  const authCol = Object.keys(sample).find((k) => /autoritate.*contract/i.test(k)) || "Autoritate contractanta";
+  const cpvCodeCol = Object.keys(sample).find((k) => /^cod\s*cpv$/i.test(k)) || "Cod CPV";
+  const cpvNameCol = Object.keys(sample).find((k) => /denumire\s*cpv/i.test(k)) || "Denumire CPV";
+  const cityCol = Object.keys(sample).find((k) => /^oras$/i.test(k)) || "Oras";
+  const procCol = Object.keys(sample).find((k) => /tip\s*procedura/i.test(k)) || "Tip procedura";
+
+  let totalValue = 0;
+  let counted = 0;
+  const values = [];
+  const suppliers = new Map();
+  const authorities = new Map();
+  const cpvs = new Map();
+  const cities = new Map();
+  const procedures = new Map();
+  const supplierSet = new Set();
+  const authSet = new Set();
+
+  for (const r of rows) {
+    const v = parseRoNumber(r[valueCol]);
+    const supplier = (r[supplierCol] || "").trim();
+    const auth = (r[authCol] || "").trim();
+    const cpvCode = (r[cpvCodeCol] || "").trim();
+    const cpvName = (r[cpvNameCol] || "").trim();
+    const city = (r[cityCol] || "").trim();
+    const proc = (r[procCol] || "").trim() || "(unspecified)";
+
+    if (supplier) supplierSet.add(supplier);
+    if (auth) authSet.add(auth);
+    procedures.set(proc, (procedures.get(proc) || 0) + 1);
+
+    if (!isFinite(v) || v <= 0) continue;
+    totalValue += v;
+    counted++;
+    values.push(v);
+
+    if (supplier) suppliers.set(supplier, (suppliers.get(supplier) || 0) + v);
+    if (auth)     authorities.set(auth, (authorities.get(auth) || 0) + v);
+    if (cpvCode)  {
+      const key = cpvCode;
+      const cur = cpvs.get(key) || { code: cpvCode, label: cpvName, value: 0 };
+      cur.value += v;
+      cpvs.set(key, cur);
+    }
+    if (city)     cities.set(city, (cities.get(city) || 0) + v);
+  }
+
+  // Median
+  values.sort((a, b) => a - b);
+  const median = values.length
+    ? values.length % 2
+      ? values[(values.length - 1) >> 1]
+      : (values[values.length / 2 - 1] + values[values.length / 2]) / 2
+    : 0;
+
+  const topN = (map, n, asObjects) =>
+    [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([name, value]) => asObjects ? asObjects(name, value) : { name: shortLabel(name), value });
+
+  return {
+    totalContracts: rows.length,
+    totalValue,
+    avgValue: counted ? totalValue / counted : 0,
+    medianValue: median,
+    uniqueSuppliers: supplierSet.size,
+    uniqueAuthorities: authSet.size,
+    topSuppliers: topN(suppliers, 15),
+    topAuthorities: topN(authorities, 15),
+    topCPV: [...cpvs.values()]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+      .map((x) => ({ code: x.code, label: shortLabel(x.label, 60), value: x.value })),
+    topCities: topN(cities, 15),
+    byProcedure: [...procedures.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 7)
+      .map(([name, value]) => ({ name: shortLabel(name, 25), value })),
+  };
+}
+
+function shortLabel(s, n = 30) {
+  if (!s) return "—";
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -895,5 +1176,45 @@ const S = {
     maxWidth: 1200, margin: "0 auto",
     display: "flex", justifyContent: "space-between",
     fontSize: 12, color: PALETTE.muted, gap: 16, flexWrap: "wrap",
+  },
+  kpiRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: 12, marginBottom: 24,
+  },
+  kpi: {
+    background: PALETTE.paper,
+    border: `1px solid ${PALETTE.rule}`,
+    borderRadius: 6, padding: "18px 20px",
+  },
+  kpiAccent: { borderColor: PALETTE.accent2 },
+  kpiLabel: {
+    fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em",
+    color: PALETTE.muted, fontWeight: 600, marginBottom: 6,
+  },
+  kpiValue: {
+    fontFamily: "'Fraunces', serif",
+    fontSize: 28, fontWeight: 600, letterSpacing: "-0.01em",
+    color: PALETTE.ink, lineHeight: 1.1,
+  },
+  card: {
+    background: PALETTE.paper,
+    border: `1px solid ${PALETTE.rule}`,
+    borderRadius: 6, padding: "20px 24px",
+    marginBottom: 20,
+  },
+  cardTitle: {
+    fontFamily: "'Fraunces', serif",
+    fontSize: 18, fontWeight: 600,
+    marginBottom: 16, color: PALETTE.ink,
+  },
+  twoCol: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+    gap: 20, marginBottom: 0,
+  },
+  footnote: {
+    fontSize: 12, color: PALETTE.muted, fontStyle: "italic",
+    marginTop: 16, lineHeight: 1.5,
   },
 };
