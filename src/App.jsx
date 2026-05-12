@@ -823,7 +823,7 @@ const S = {
     color: PALETTE.muted, fontWeight: 600, marginBottom: 4,
   },
   fieldValue: { fontSize: 15, color: PALETTE.ink },
-  mono: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13 },
+  mono: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13, wordBreak: "break-all" },
   details: {
     padding: "14px 28px",
     borderTop: `1px solid ${PALETTE.rule}`,
