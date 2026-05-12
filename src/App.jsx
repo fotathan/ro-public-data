@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import Papa from "papaparse";
 
 // ───────────────────────────────────────────────────────────────────────────
 //  RO PUBLIC DATA — ENGLISH
@@ -29,11 +30,12 @@ const ANAF_URL = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
 // values below are the live ones for the "Contracte" CSV per year.
 // If a resource_id 404s, the user can paste a fresh one — data.gov.ro
 // occasionally re-publishes resources with new UUIDs.
-const SEAP_DATASETS = {
-  "2024": { label: "Contracts 2024", resource_id: null }, // discovered at runtime
-  "2023": { label: "Contracts 2023", resource_id: null },
-  "2022": { label: "Contracts 2022", resource_id: null },
+const SEAP_FILES = {
+  "2024-q1": { label: "Q1 2024", path: "/data/contracts-2024-q1.csv" },
 };
+
+// In-memory cache: parsed rows survive tab-switches
+const seapCache = {};
 
 // ───────────────────────────────────────────────────────────────────────────
 //  Field translation table — ANAF responds in Romanian. We render in English.
@@ -95,35 +97,44 @@ async function fetchAnaf(cui) {
 // ───────────────────────────────────────────────────────────────────────────
 //  data.gov.ro CKAN — discover the "Contracte" resource for a given year
 // ───────────────────────────────────────────────────────────────────────────
-async function findContractsResource(year) {
-  const target = `https://data.gov.ro/api/3/action/package_show?id=achizitii-publice-${year}`;
-  const url = PROXY + encodeURIComponent(target);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`data.gov.ro returned ${res.status}`);
-  const json = await res.json();
-  if (!json.success) throw new Error("Dataset not available for that year");
-  const contracts = (json.result.resources || []).find((r) =>
-    /contract/i.test(r.name) && !/subsec/i.test(r.name)
-  );
-  if (!contracts) throw new Error("No Contracts resource found in that dataset");
-  return contracts.id;
+async function loadProcurementData(key) {
+  if (seapCache[key]) return seapCache[key];
+  const file = SEAP_FILES[key];
+  if (!file) throw new Error(`Unknown dataset: ${key}`);
+
+  console.log("[SEAP] loading", file.path);
+  const res = await fetch(file.path);
+  if (!res.ok) throw new Error(`Failed to load ${file.path}: ${res.status}`);
+  const text = await res.text();
+
+  return new Promise((resolve, reject) => {
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (result) => {
+        console.log("[SEAP] parsed", result.data.length, "rows");
+        seapCache[key] = result.data;
+        resolve(result.data);
+      },
+      error: reject,
+    });
+  });
 }
 
-async function searchProcurement({ year, q, limit = 25 }) {
-  let rid = SEAP_DATASETS[year]?.resource_id;
-  if (!rid) {
-    rid = await findContractsResource(year);
-    SEAP_DATASETS[year] = { ...SEAP_DATASETS[year], resource_id: rid };
+function searchProcurementLocal(rows, q) {
+  if (!q || !q.trim()) return rows.slice(0, 50);
+  const needle = q.toLowerCase().trim();
+  const hits = [];
+  for (const row of rows) {
+    for (const v of Object.values(row)) {
+      if (v && String(v).toLowerCase().includes(needle)) {
+        hits.push(row);
+        break;
+      }
+    }
+    if (hits.length >= 200) break;
   }
-  const params = new URLSearchParams({ resource_id: rid, limit: String(limit) });
-  if (q) params.set("q", q);
-  const target = `https://data.gov.ro/api/3/action/datastore_search?${params}`;
-  const url = PROXY + encodeURIComponent(target);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`CKAN returned ${res.status}`);
-  const json = await res.json();
-  if (!json.success) throw new Error("CKAN refused the query");
-  return json.result;
+  return hits;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -344,16 +355,28 @@ function AnafResult({ data }) {
 
 // ───────────────────────────────────────────────────────────────────────────
 function ProcurementPanel() {
-  const [year, setYear] = useState("2024");
+  const [dataset, setDataset] = useState("2024-q1");
   const [q, setQ]       = useState("");
+  const [rows, setRows] = useState([]);
+  const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState("");
-  const [res, setRes]   = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const run = async () => {
-    setBusy(true); setErr(""); setRes(null);
-    try { setRes(await searchProcurement({ year, q })); }
-    catch (e) { console.error("LOOKUP FAILED:", e); setErr(e.message); }
+  // Load CSV when dataset changes
+  useEffect(() => {
+    setLoading(true); setErr(""); setResults(null);
+    loadProcurementData(dataset)
+      .then((data) => { setRows(data); setLoading(false); })
+      .catch((e) => { setErr(e.message); setLoading(false); });
+  }, [dataset]);
+
+  const run = () => {
+    setBusy(true); setErr("");
+    try {
+      const hits = searchProcurementLocal(rows, q);
+      setResults({ records: hits, total: hits.length, all: rows.length });
+    } catch (e) { setErr(e.message); }
     finally { setBusy(false); }
   };
 
@@ -361,69 +384,66 @@ function ProcurementPanel() {
     <section>
       <h2 style={S.h2}>Search public procurement contracts</h2>
       <p style={S.lead}>
-        Full-text search across contracts published on SEAP and mirrored to
-        data.gov.ro. Filter by year. Try a supplier name, a CPV code, or a
-        contracting authority. Results stream from the open data portal.
+        Full-text search across SEAP contract awards. Data sourced from
+        data.gov.ro quarterly exports and bundled with the app for instant search.
+        Currently <strong>Q1 2024 only</strong> — additional quarters coming soon.
       </p>
 
       <div style={S.queryBar}>
-        <select value={year} onChange={(e) => setYear(e.target.value)} style={S.select}>
-          {Object.keys(SEAP_DATASETS).map((y) => (
-            <option key={y} value={y}>Year {y}</option>
+        <select value={dataset} onChange={(e) => setDataset(e.target.value)} style={S.select}>
+          {Object.entries(SEAP_FILES).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
           ))}
         </select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
-          placeholder='e.g. "servicii IT" or a CPV code like 33141000'
+          onKeyDown={(e) => e.key === "Enter" && !loading && run()}
+          placeholder='Supplier name, CPV code, authority, county…'
           style={{ ...S.input, flex: 1 }}
+          disabled={loading}
         />
-        <button onClick={run} disabled={busy} style={S.btn}>
-          {busy ? "Searching…" : "Search"}
+        <button onClick={run} disabled={busy || loading} style={S.btn}>
+          {loading ? "Loading data…" : busy ? "Searching…" : "Search"}
         </button>
       </div>
 
       <div style={S.exampleRow}>
         Try:
-        {["servicii IT", "medicamente", "Bucuresti", "33141000"].map((s) => (
+        {["medicamente", "servicii IT", "Bucuresti", "33141000"].map((s) => (
           <button key={s} style={S.chip}
-                  onClick={() => { setQ(s); setTimeout(run, 0); }}>
+                  onClick={() => { setQ(s); setTimeout(run, 0); }}
+                  disabled={loading}>
             {s}
           </button>
         ))}
       </div>
 
+      {loading && <div style={S.empty}>Loading {SEAP_FILES[dataset].label} contracts…</div>}
       {err && <div style={S.error}>⚠ {err}</div>}
-      {res && <ProcurementResults res={res} />}
+      {results && <ProcurementResults results={results} />}
     </section>
   );
 }
 
-function ProcurementResults({ res }) {
-  const records = res.records || [];
+function ProcurementResults({ results }) {
+  const records = results.records || [];
   if (!records.length) return <div style={S.empty}>No contracts matched.</div>;
 
-  // Pick columns that exist in this CKAN resource. Most years carry similar
-  // field names but they drift, so we discover from the first record.
-  const sample = records[0];
-  const candidates = [
-    ["Authority",  ["Tip_Autoritate", "Autoritate_Contractanta", "AC_Numar", "AC_Denumire"]],
-    ["Supplier",   ["Castigator_Denumire", "Castigator", "Furnizor"]],
-    ["CPV",        ["CPV_Code", "CPV_Cod", "Cod_CPV"]],
-    ["Object",     ["Titlu_Contract", "Obiect_Contract", "Descriere_Contract"]],
-    ["Value",      ["Valoare", "Valoare_Contract", "Valoare_Estimata"]],
-    ["Currency",   ["Moneda"]],
-    ["Date",       ["Data_Atribuire", "Data_Anunt", "Data"]],
+  const cols = [
+    ["Date",      "Data contract"],
+    ["Authority", "Autoritate contractanta"],
+    ["Supplier",  "Ofertant"],
+    ["CPV",       "Cod CPV"],
+    ["Object",    "Denumire CPV"],
+    ["Value",     "Valoare contract (RON)"],
+    ["County",    "Oras"],
   ];
-  const cols = candidates
-    .map(([label, keys]) => [label, keys.find((k) => k in sample)])
-    .filter(([, k]) => k);
 
   return (
     <div>
       <div style={S.resultsCount}>
-        {records.length} of {res.total?.toLocaleString() || "?"} matching contracts
+        {records.length} matches (of {results.all.toLocaleString()} contracts in dataset)
       </div>
       <div style={S.tableWrap}>
         <table style={S.table}>
