@@ -90,7 +90,9 @@ async function fetchAnaf(cui) {
   console.log("[ANAF] parsed:", data);
 
   const hit = data.found && data.found[0];
-  if (!hit) throw new Error(`CUI ${cleanCui} not found in ANAF registry`);
+  if (!hit) throw new Error(
+  `CUI ${cleanCui} not found in ANAF's VAT registry. The company may be struck off, never registered, or a non-VAT entity (e.g. a PFA or a non-trading legal person).`
+);
   return hit;
 }
 
@@ -280,7 +282,7 @@ function AnafPanel() {
 
       <div style={S.exampleRow}>
         Try:
-        {["14837428", "8939059", "23093488"].map((c) => (
+        {["14837428", "8939059", "13267221"].map((c) => (
   <button key={c} style={S.chip}
           onClick={() => run(c)}>
     {c}
