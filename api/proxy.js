@@ -50,8 +50,12 @@ export default async function handler(req, res) {
     res.status(upstream.status);
     res.setHeader("Content-Type",
       upstream.headers.get("content-type") || "application/json");
-    res.setHeader("Cache-Control",
-      "s-maxage=3600, stale-while-revalidate=86400");
+    if (upstream.ok) {
+      res.setHeader("Cache-Control",
+        "s-maxage=3600, stale-while-revalidate=86400");
+    } else {
+      res.setHeader("Cache-Control", "no-store");
+    }
     res.send(text);
   } catch (e) {
     console.error("PROXY ERROR:", e);
