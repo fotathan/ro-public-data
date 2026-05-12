@@ -944,7 +944,7 @@ function Source({ name, full, endpoint, what }) {
 //  Styles
 // ───────────────────────────────────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Fira+Sans+Condensed:wght@400;500;600;700&display=swap');
   * { box-sizing: border-box; }
   body { margin: 0; }
   button, input, select { font: inherit; }
@@ -969,7 +969,7 @@ const S = {
     minHeight: "100vh",
     background: PALETTE.bg,
     color: PALETTE.ink,
-    fontFamily: "'Manrope', system-ui, sans-serif",
+    fontFamily: "'Fira Sans Condensed', system-ui, sans-serif",
     fontSize: 15,
     lineHeight: 1.55,
   },
