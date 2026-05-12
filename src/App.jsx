@@ -373,14 +373,16 @@ function ProcurementPanel() {
       .catch((e) => { setErr(e.message); setLoading(false); });
   }, [dataset]);
 
-  const run = () => {
-    setBusy(true); setErr("");
-    try {
-      const hits = searchProcurementLocal(rows, q);
-      setResults({ records: hits, total: hits.length, all: rows.length });
-    } catch (e) { setErr(e.message); }
-    finally { setBusy(false); }
-  };
+  const run = (value) => {
+  const target = value ?? q;
+  setQ(target);
+  setBusy(true); setErr("");
+  try {
+    const hits = searchProcurementLocal(rows, target);
+    setResults({ records: hits, total: hits.length, all: rows.length });
+  } catch (e) { setErr(e.message); }
+  finally { setBusy(false); }
+};
 
   return (
     <section>
@@ -405,7 +407,7 @@ function ProcurementPanel() {
           style={{ ...S.input, flex: 1 }}
           disabled={loading}
         />
-        <button onClick={run} disabled={busy || loading} style={S.btn}>
+        <button onClick={() => run()} disabled={busy || loading} style={S.btn}>
           {loading ? "Loading data…" : busy ? "Searching…" : "Search"}
         </button>
       </div>
@@ -413,12 +415,12 @@ function ProcurementPanel() {
       <div style={S.exampleRow}>
         Try:
         {["medicamente", "servicii IT", "Bucuresti", "33141000"].map((s) => (
-          <button key={s} style={S.chip}
-                  onClick={() => { setQ(s); setTimeout(run, 0); }}
-                  disabled={loading}>
-            {s}
-          </button>
-        ))}
+  <button key={s} style={S.chip}
+          onClick={() => run(s)}
+          disabled={loading}>
+    {s}
+  </button>
+))}
       </div>
 
       {loading && <div style={S.empty}>Loading {SEAP_FILES[dataset].label} contracts…</div>}
