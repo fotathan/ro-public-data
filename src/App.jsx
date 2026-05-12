@@ -245,13 +245,15 @@ function AnafPanel() {
   const [err, setErr]       = useState("");
   const [busy, setBusy]     = useState(false);
 
-  const run = async () => {
-    if (!cui.trim()) return;
-    setBusy(true); setErr(""); setData(null);
-    try { setData(await fetchAnaf(cui)); }
-    catch (e) { console.error("LOOKUP FAILED:", e); setErr(e.message); }
-    finally { setBusy(false); }
-  };
+  const run = async (value) => {
+  const target = (value ?? cui).trim();
+  if (!target) return;
+  setCui(target);
+  setBusy(true); setErr(""); setData(null);
+  try { setData(await fetchAnaf(target)); }
+  catch (e) { console.error("LOOKUP FAILED:", e); setErr(e.message); }
+  finally { setBusy(false); }
+};
 
   return (
     <section>
@@ -279,11 +281,11 @@ function AnafPanel() {
       <div style={S.exampleRow}>
         Try:
         {["14837428", "8939059", "23093488"].map((c) => (
-          <button key={c} style={S.chip}
-                  onClick={() => { setCui(c); setTimeout(run, 0); }}>
-            {c}
-          </button>
-        ))}
+  <button key={c} style={S.chip}
+          onClick={() => run(c)}>
+    {c}
+  </button>
+))}
       </div>
 
       {err  && <div style={S.error}>⚠ {err}</div>}
